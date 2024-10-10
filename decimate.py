@@ -3,6 +3,7 @@
 import obja
 import numpy as np
 import sys
+import objToGraphe
 
 class Decimater(obja.Model):
     """
@@ -12,7 +13,7 @@ class Decimater(obja.Model):
         super().__init__()
         self.deleted_faces = set()
 
-    def contract(self, output):
+    def contract(self, output, graph):
         """
         Decimates the model stupidly, and write the resulting obja in output.
         """
@@ -57,11 +58,18 @@ def main():
     """
     np.seterr(invalid = 'raise')
     model = Decimater()
-    model.parse_file('example/suzanne.obj')
-
+    filename='example/test.obj'
+    
+    #model.parse_file(filename)
+    vertices, faces = objToGraphe.load_obj(filename)
+    graph = objToGraphe.create_graph(vertices, faces)
+    
+    objToGraphe.compress_model(graph)
+    objToGraphe.visualize_mst_simple(graph, objToGraphe.minimum_spanning_tree(graph))
+    
     with open('example/suzanne.obja', 'w') as output:
         model.contract(output)
-
+    objToGraphe.minimum_spanning_tree(graph)
 
 if __name__ == '__main__':
     main()
