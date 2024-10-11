@@ -5,7 +5,8 @@
 
 # Standard library imports.
 import sys
-
+from io import StringIO
+import html
 if sys.version_info[0] < 3:
     from SocketServer import ThreadingMixIn
     import BaseHTTPServer
@@ -154,7 +155,7 @@ class RequestHandler(SimpleHTTPRequestHandler):
             return None
         list.sort(key=lambda a: a.lower())
         f = StringIO()
-        displaypath = cgi.escape(unquote(self.path))
+        displaypath = html.escape(unquote(self.path))
         f.write('<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">')
         f.write("<html>\n<title>Directory listing for %s</title>\n" % displaypath)
         f.write("<body>\n<h2>Directory listing for %s</h2>\n" % displaypath)
@@ -170,7 +171,7 @@ class RequestHandler(SimpleHTTPRequestHandler):
                 displayname = name + "@"
                 # Note: a link to a directory displays with @ and links with /
             f.write('<li><a href="%s">%s</a>\n'
-                    % (quote(linkname), cgi.escape(displayname)))
+                    % (quote(linkname), html.escape(displayname)))
         f.write("</ul>\n<hr>\n</body>\n</html>\n")
         length = f.tell()
         f.seek(0)
