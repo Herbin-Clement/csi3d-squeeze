@@ -19,6 +19,7 @@ class Decimater(obja.Model):
         """
         operations = []
 
+        # TODO:  à supprimer ?
         for (vertex_index, vertex) in enumerate(self.vertices):
             operations.append(('ev', vertex_index, vertex + 0.25))
 
@@ -64,7 +65,7 @@ def main():
     vertices, faces = objToGraphe.load_obj(filename)
     graph = objToGraphe.create_graph(vertices, faces)
     
-    objToGraphe.compress_model(graph)
+    objToGraphe.compress_model(graph, faces)
     objToGraphe.visualize_mst_simple(graph, objToGraphe.minimum_spanning_tree(graph))
     
     with open('example/suzanne.obja', 'w') as output:
