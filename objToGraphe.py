@@ -4,6 +4,9 @@ import utils
 import matplotlib.pyplot as plt
 
 def visualize_mst_simple(graph, mst):
+    """
+    Visualize the minimum spanning tree of a graph.
+    """
     pos = nx.get_node_attributes(graph, 'pos')
 
     # Vérifier si les coordonnées sont en 3D et projeter en 2D
@@ -18,6 +21,9 @@ def visualize_mst_simple(graph, mst):
     plt.show()
 
 def load_obj(filename):
+    """
+    Load the .obj file.
+    """
     vertices = []
     faces = []
     
@@ -34,6 +40,9 @@ def load_obj(filename):
     return np.array(vertices), faces
 
 def create_graph(vertices, faces):
+    """
+    Create a networkX graph from a list of faces and vertices.
+    """
     G = nx.Graph()
     
     for i, vertex in enumerate(vertices):
@@ -43,10 +52,13 @@ def create_graph(vertices, faces):
         for i in range(len(face)):
             point1 = vertices[face[i]]
             point2 = vertices[face[(i + 1) % len(face)]]
-            distance = utils.hausdorff_distance(point1.reshape(1, -1), point2.reshape(1, -1)) 
+            distance = utils.euclidean_distance(point1.reshape(1, -1), point2.reshape(1, -1)) 
             G.add_edge(face[i], face[(i + 1) % len(face)], weight=distance)
     return G
 
 def minimum_spanning_tree(graph):
+    """
+    Compute the minimum spanning tree of a graph.
+    """
     mst = nx.minimum_spanning_tree(graph)
     return mst
