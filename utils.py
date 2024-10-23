@@ -11,7 +11,8 @@ def is_valid_triangle(v1, v2, w, faces):
     Check if v1-v2-w is a valid triangle.
     """
     for face in faces:
-        if set([w,v1,v2]) == face:
+        print(set([w,v1,v2]), set(face))
+        if set([w,v1,v2]) == set(face):
             return True
     return False
 

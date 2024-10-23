@@ -24,22 +24,22 @@ def load_obj(filename):
     """
     Load the .obj file.
     """
-    vertices = []
+    vertices = np.array([])
     faces = []
     
     with open(filename, 'r') as file:
         for line in file:
             if line.startswith('v '): 
                 parts = line.split()
-                vertices.append([float(parts[1]), float(parts[2]), float(parts[3])])
+                vertices = np.concatenate((vertices, np.array([float(parts[1]), float(parts[2]), float(parts[3])])), axis=0)
             elif line.startswith('f '): 
                 parts = line.split()
                 face = [int(part.split('/')[0]) - 1 for part in parts[1:]]  # Indices des sommets
-                faces.append(set(face))
+                faces.append(list(set(face)))
     
-    return np.array(vertices), faces
+    return vertices, faces
 
-def create_graph(vertices, faces):
+def create_graph(vertices, faces, visualize):
     """
     Create a networkX graph from a list of faces and vertices.
     """
@@ -54,6 +54,10 @@ def create_graph(vertices, faces):
             point2 = vertices[face[(i + 1) % len(face)]]
             distance = utils.euclidean_distance(point1.reshape(1, -1), point2.reshape(1, -1)) 
             G.add_edge(face[i], face[(i + 1) % len(face)], weight=distance)
+    if visualize:
+        pos = nx.get_node_attributes(G, 'pos')
+        nx.draw(G, pos, with_labels=True, node_color='lightblue', edge_color='gray', node_size=500, font_size=10)
+        plt.show()
     return G
 
 def minimum_spanning_tree(graph):
