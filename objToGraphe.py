@@ -24,40 +24,56 @@ def load_obj(filename):
     """
     Load the .obj file.
     """
-    vertices = np.array([])
+    vertices = []  # Utiliser une liste pour stocker chaque sommet temporairement
     faces = []
     
     with open(filename, 'r') as file:
         for line in file:
             if line.startswith('v '): 
                 parts = line.split()
-                vertices = np.concatenate((vertices, np.array([float(parts[1]), float(parts[2]), float(parts[3])])), axis=0)
+                vertex = [float(parts[1]), float(parts[2]), float(parts[3])]
+                vertices.append(vertex)  # Ajouter chaque sommet en tant que sous-liste
             elif line.startswith('f '): 
                 parts = line.split()
                 face = [int(part.split('/')[0]) - 1 for part in parts[1:]]  # Indices des sommets
                 faces.append(list(set(face)))
     
+    # Convertir vertices en un tableau numpy 2D
+    vertices = np.array(vertices)
+    
     return vertices, faces
 
+def draw_graph(G):
+    pos = nx.get_node_attributes(G, 'pos')
+        
+    # Convert positions to dictionary format compatible with nx.draw
+    pos = {k: v[:2] for k, v in pos.items()}  # Ensure all positions are 2D
+    
+    nx.draw(G, pos, with_labels=True, node_color='lightblue', edge_color='gray', node_size=500, font_size=10)
+    plt.show()
 def create_graph(vertices, faces, visualize):
     """
     Create a networkX graph from a list of faces and vertices.
     """
     G = nx.Graph()
     
+    # Ensure vertices are in correct format
+    vertices = np.array(vertices)  # Convert to numpy array for easier manipulation
+    if vertices.ndim == 1:
+        raise ValueError("Vertices should be a 2D array, where each vertex is a point [x, y] or [x, y, z].")
+    
     for i, vertex in enumerate(vertices):
         G.add_node(i, pos=vertex)
     
     for face in faces:
         for i in range(len(face)):
-            point1 = vertices[face[i]]
-            point2 = vertices[face[(i + 1) % len(face)]]
+            point1 = np.array(vertices[face[i]])
+            point2 = np.array(vertices[face[(i + 1) % len(face)]])
             distance = utils.euclidean_distance(point1.reshape(1, -1), point2.reshape(1, -1)) 
             G.add_edge(face[i], face[(i + 1) % len(face)], weight=distance)
+    
     if visualize:
-        pos = nx.get_node_attributes(G, 'pos')
-        nx.draw(G, pos, with_labels=True, node_color='lightblue', edge_color='gray', node_size=500, font_size=10)
-        plt.show()
+        draw_graph(G)
     return G
 
 def minimum_spanning_tree(graph):
