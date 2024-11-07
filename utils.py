@@ -10,17 +10,18 @@ def is_valid_triangle(v1, v2, w, faces):
     """
     Check if v1-v2-w is a valid triangle.
     """
-    for face in faces:        
+    for face in faces.values():        
         if set([w,v1,v2]) == set(face):
             #print(set([w,v1,v2]), set(face))
             return True
     return False
 
-def can_collaps_quad(v1, v2, w1, w2, edges,collapsed_vertices):
+def can_collaps_quad(v1, v2, w1, w2, edges, collapsed_vertices):
     """
     Check if v1-v2-w1-w2 quad can be collapsed.
     """
-    if ((v1, w1) in edges and (w2, v2) in edges and (v1,v2) in edges):
+    cond = (v1, w1) in edges and (w2, v2) in edges and (v1,v2) in edges
+    if cond:
         print(v1,w1, w2, v2)
     # Vérifie si e1 et e2 ne peuvent pas être réduits ensemble
-    return not ((v1, w1) in edges and (w2, v2) in edges and (v1,v2) in edges and (w1 in collapsed_vertices or w2 in collapsed_vertices))
+    return not (cond and (w1 in collapsed_vertices or w2 in collapsed_vertices))

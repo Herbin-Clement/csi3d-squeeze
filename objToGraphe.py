@@ -40,8 +40,10 @@ def load_obj(filename):
     
     # Convertir vertices en un tableau numpy 2D
     vertices = np.array(vertices)
-    
-    return vertices, faces
+    idx_to_faces = {i: face for i, face in enumerate(faces)}
+    faces_count = len(faces)
+    print(idx_to_faces)
+    return vertices, idx_to_faces, faces_count
 
 def draw_graph(G):
     pos = nx.get_node_attributes(G, 'pos')
@@ -51,6 +53,7 @@ def draw_graph(G):
     
     nx.draw(G, pos, with_labels=True, node_color='lightblue', edge_color='gray', node_size=500, font_size=10)
     plt.show()
+
 def create_graph(vertices, faces, visualize):
     """
     Create a networkX graph from a list of faces and vertices.
@@ -65,7 +68,7 @@ def create_graph(vertices, faces, visualize):
     for i, vertex in enumerate(vertices):
         G.add_node(i, pos=vertex)
     
-    for face in faces:
+    for face in faces.values():
         for i in range(len(face)):
             point1 = np.array(vertices[face[i]])
             point2 = np.array(vertices[face[(i + 1) % len(face)]])
