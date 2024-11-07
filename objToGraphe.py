@@ -8,7 +8,7 @@ def visualize_mst_simple(graph, mst):
     Visualize the minimum spanning tree of a graph.
     """
     pos = nx.get_node_attributes(graph, 'pos')
-
+  
     # Vérifier si les coordonnées sont en 3D et projeter en 2D
     if any(len(coord) == 3 for coord in pos.values()):
         pos = {k: (v[0], v[1]) for k, v in pos.items()}  # Utiliser x et y
@@ -18,6 +18,7 @@ def visualize_mst_simple(graph, mst):
     nx.draw(mst, pos, with_labels=True, node_color='lightblue', edge_color='red', node_size=500, font_size=12)
 
     plt.title("Minimum Spanning Tree")
+    
     plt.show()
 
 def load_obj(filename):
