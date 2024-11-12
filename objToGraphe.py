@@ -8,7 +8,6 @@ def visualize_mst_simple(graph, mst):
     Visualize the minimum spanning tree of a graph.
     """
     pos = nx.get_node_attributes(graph, 'pos')
-  
     # Vérifier si les coordonnées sont en 3D et projeter en 2D
     if any(len(coord) == 3 for coord in pos.values()):
         pos = {k: (v[0], v[1]) for k, v in pos.items()}  # Utiliser x et y
@@ -43,7 +42,6 @@ def load_obj(filename):
     vertices = np.array(vertices)
     idx_to_faces = {i: face for i, face in enumerate(faces)}
     faces_count = len(faces)
-    print(idx_to_faces)
     return vertices, idx_to_faces, faces_count
 
 def draw_graph(G):
@@ -51,9 +49,9 @@ def draw_graph(G):
         
     # Convert positions to dictionary format compatible with nx.draw
     pos = {k: v[:2] for k, v in pos.items()}  # Ensure all positions are 2D
-    
+    plt.figure()
     nx.draw(G, pos, with_labels=True, node_color='lightblue', edge_color='gray', node_size=500, font_size=10)
-    plt.show()
+    plt.show(block=False)
 
 def create_graph(vertices, faces, visualize):
     """

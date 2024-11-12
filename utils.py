@@ -21,7 +21,8 @@ def can_collaps_quad(v1, v2, w1, w2, edges, collapsed_vertices):
     Check if v1-v2-w1-w2 quad can be collapsed.
     """
     cond = (v1, w1) in edges and (w2, v2) in edges and (v1,v2) in edges
-    if cond:
-        print(v1,w1, w2, v2)
     # Vérifie si e1 et e2 ne peuvent pas être réduits ensemble
     return not (cond and (w1 in collapsed_vertices or w2 in collapsed_vertices))
+
+def pause():
+    input("Press the <ENTER> key to continue...")

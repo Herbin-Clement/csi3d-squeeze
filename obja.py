@@ -318,6 +318,12 @@ class Output:
                 random.uniform(0, 1)),
                 file=self.output
             )
+    def remove_face(self, index):
+        print('df {}'.format(
+            self.face_mapping[index] + 1
+        ),
+            file=self.output
+        )
 
     def edit_face(self, index, face):
         """
