@@ -15,20 +15,21 @@ class Decimater(obja.Model):
         self.graph = nx.empty_graph()
          
     def visualize_3d(self):
-        # vertices_coords = np.array([
-        #     [0, 0, 0],  # Vertex 1
-        #     [1, 0, 0],  # Vertex 2
-        #     [0, 1, 0],  # Vertex 3
-        #     [0, 0, 1],  # Vertex 4
-        # ])
+        vertices_coords = np.array([
+            [0, 0, 0],  # Vertex 1
+            [1, 0, 0],  # Vertex 2
+            [0, 1, 0],  # Vertex 3
+            [0, 0, 1],  # Vertex 4
+        ])
 
-        # faces = [
-        #     [0, 1, 2],  # Face 1 (triangle)
-        #     [0, 1, 3],  # Face 2 (triangle)
-        #     [0, 2, 3],  # Face 3 (triangle)
-        #     [1, 2, 3],  # Face 4 (triangle)
-        # ]
+        faces = [
+            [0, 1, 2],  # Face 1 (triangle)
+            [0, 1, 3],  # Face 2 (triangle)
+            [0, 2, 3],  # Face 3 (triangle)
+            [1, 2, 3],  # Face 4 (triangle)
+        ]
         # Extraire les coordonnées des vertices
+        
         vertices_coords = np.array([self.graph.nodes[v]['pos'] for v in self.graph.nodes])
         
         # Vérifiez que les coordonnées des vertices sont bien extraites
@@ -44,7 +45,7 @@ class Decimater(obja.Model):
                 faces.append(face)
         
         if len(faces) == 0:
-            # print("Aucune face valide pour l'affichage.")
+            print("Aucune face valide pour l'affichage.")
             return
         # Créer la visualisation 3D avec Plotly
         fig = go.Figure(data=[go.Mesh3d(
@@ -77,12 +78,15 @@ class Decimater(obja.Model):
     def get_graph(self):
         return self.graph
 
-    def compress_model(self, output_filename, max_step=10):
+    def compress_model(self, output_filename,totalVertex, pourcentageDecimate, max_step=10):
         compressed = False
         operations = []
         step = 0
         objToGraphe.draw_graph(self.graph)
-        while not compressed and step < max_step:
+        pourcentageDecimeActuel = self.graph.number_of_nodes() / totalVertex*100 
+        while (pourcentageDecimeActuel > pourcentageDecimate or step > max_step) and not compressed:
+            pourcentageDecimeActuel = self.graph.number_of_nodes() / totalVertex*100 
+            print(f"Pourcentage de decimation actuel: {pourcentageDecimeActuel}")
             print(f"=========== Step {step + 1} ===========")
             step_operations = self.step_compression()
             operations = operations + step_operations
@@ -190,6 +194,7 @@ class Decimater(obja.Model):
                 del self.faces[face_index]
             
             # Reconnecter les voisins de v2 à v1
+            xx_hfsdhfcf=0
             for n2 in neighbors_v2:
                 if n2 != v1 and (n2 not in neighbors_v1) and n2 not in removed_vertices:
                     # print("ajout edge", (v1, n2))
@@ -217,9 +222,10 @@ class Decimater(obja.Model):
         # self.graph.add_edges_from(new_edges)
         a = len(self.graph.nodes)
         print(f"{b} => {a}: -{b - a}")
-        # objToGraphe.draw_graph(self.graph)
-        # self.visualize_3d()
+        objToGraphe.draw_graph(self.graph)
+        #self.visualize_3d()
         # print("----------------------- FIN ITERATION -----------------------")
+        
         return operations
 
 def main():
@@ -228,14 +234,14 @@ def main():
     """
     np.seterr(invalid = 'raise')
     model = Decimater()
-    filename='example/suzanne.obj'
+    filename='example/test.obj'
 
     model.load_graph(filename)
 
     # graph = model.get_graph()
     # objToGraphe.visualize_mst_simple(graph, objToGraphe.minimum_spanning_tree(graph))
-
-    model.compress_model("example/test.obja")
-
+    
+    model.compress_model("example/bunny.obja", len(model.graph.nodes),pourcentageDecimate=0.3)
+    #model.visualize_3d()
 if __name__ == '__main__':
     main()
