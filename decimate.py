@@ -78,22 +78,24 @@ class Decimater(obja.Model):
     def get_graph(self):
         return self.graph
 
-    def compress_model(self, output_filename,totalVertex, pourcentageDecimate, max_step=10):
+    def compress_model(self, output_filename, maxDecimateRatio, max_step=10):
         compressed = False
         operations = []
         step = 0
         objToGraphe.draw_graph(self.graph)
-        pourcentageDecimeActuel = self.graph.number_of_nodes() / totalVertex*100 
-        while (pourcentageDecimeActuel > pourcentageDecimate or step > max_step) and not compressed:
-            pourcentageDecimeActuel = self.graph.number_of_nodes() / totalVertex*100 
-            print(f"Pourcentage de decimation actuel: {pourcentageDecimeActuel}")
+        decimateRatio = 1
+        initialNumberOfNodes = self.graph.number_of_nodes()
+        while (decimateRatio > maxDecimateRatio or step > max_step) and not compressed:
             print(f"=========== Step {step + 1} ===========")
             step_operations = self.step_compression()
             operations = operations + step_operations
-            if len(step_operations) == 0:
-                compressed = True
             step += 1
+            decimateRatio = self.graph.number_of_nodes() / initialNumberOfNodes 
             print(f"Nb op: {len(step_operations)}")
+            print(f"Pourcentage de decimation actuel: {decimateRatio}")
+            if len(step_operations) == 0 or decimateRatio > maxDecimateRatio:
+                compressed = True
+
         objToGraphe.draw_graph(self.graph)
         operations.reverse()
 
@@ -241,7 +243,7 @@ def main():
     # graph = model.get_graph()
     # objToGraphe.visualize_mst_simple(graph, objToGraphe.minimum_spanning_tree(graph))
     
-    model.compress_model("example/bunny.obja", len(model.graph.nodes),pourcentageDecimate=0.3)
+    model.compress_model("example/bunny.obja", maxDecimateRatio=0.3)
     #model.visualize_3d()
 if __name__ == '__main__':
     main()
