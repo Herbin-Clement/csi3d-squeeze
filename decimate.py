@@ -78,7 +78,7 @@ class Decimater(obja.Model):
     def get_graph(self):
         return self.graph
 
-    def stat(self, operations, printFaces=True):
+    def stat(self, operations, printFaces=False):
         addVertex = 0
         addFace = 0
         editFace = 0
@@ -126,7 +126,7 @@ class Decimater(obja.Model):
 
         # Créer un objet Output pour écrire dans le fichier de sortie
         with open(outputFilename, 'w') as output_file:
-            output_model = obja.Output(output_file, random_color=True)
+            output_model = obja.Output(output_file, random_color=False)
             
             for v in self.graph.nodes:
                 output_model.add_vertex(v, self.graph.nodes[v]["pos"])
@@ -147,6 +147,15 @@ class Decimater(obja.Model):
                     output_model.edit_face_vertex(index, value[0], value[1])
                 else:
                     output_model.edit_vertex(index, value)
+
+        # Trouver les différences entre tableau1 et tableau2
+        tableau1 = [sorted(x) for x in self.faces.values()]
+        tableau2 = [sorted(clique) for clique in nx.enumerate_all_cliques(self.graph) if len(clique) == 3]
+        diff_1_to_2 = [x for x in tableau1 if x not in tableau2]
+        diff_2_to_1 = [x for x in tableau2 if x not in tableau1]
+
+        print("Présents dans tableau1 mais pas dans tableau2:", diff_1_to_2)
+        print("Présents dans tableau2 mais pas dans tableau1:", diff_2_to_1)
         utils.pause()
         
 
@@ -197,11 +206,11 @@ class Decimater(obja.Model):
             collapsed_vertices.append(v2)
             collapsed_edges.append(sorted([v1,v2]))
             removed_vertices.append(v2)
-            print(f"remove {v2}")
+            # print(f"remove {v2}")
 
             for n2 in neighbors_v2:
                 if n2 != v1 and (n2 not in neighbors_v1) and n2 not in removed_vertices:
-                    print(f"add edge f{sorted([v1, n2])}")
+                    # print(f"add edge f{sorted([v1, n2])}")
                     new_edges.append(sorted([v1, n2]))
 
             # Enlève les faces ayant v2
@@ -223,12 +232,12 @@ class Decimater(obja.Model):
                         tmp_deleted_faces[face_index] = face
             for face_index, face in tmp_deleted_faces.items():
                 operations.append(('face', face_index, face))
-                print(f"add {face}")
+                # print(f"add {face}")
                 self.deleted_faces[face_index] = face
                 del self.faces[face_index]
             for face_index, face in tmp_add_faces.items():
                 operations.append(('remove_face', face_index, face))
-                print(f"add {face}")
+                # print(f"add {face}")
                 self.faces[face_index] = face
             
             vertex_v2 = self.graph.nodes[v2]['pos']
@@ -240,9 +249,9 @@ class Decimater(obja.Model):
             self.graph.remove_node(node)
 
         # Add edges
-        for edgeaa in new_edges:
-            if not (edgeaa[0] in removed_vertices or edgeaa[1] in removed_vertices):
-                self.graph.add_edge(edgeaa[0], edgeaa[1])
+        for new_edge in new_edges:
+            if not (new_edge[0] in removed_vertices or new_edge[1] in removed_vertices):
+                self.graph.add_edge(new_edge[0], new_edge[1])
         # self.graph.add_edges_from(new_edges)
         
         a = len(self.graph.nodes)
@@ -275,7 +284,7 @@ def main():
 
     model.load_graph(filename)
     
-    model.compress_model("example/bunny.obja", maxDecimateRatio=0.3, maxStep=3)
+    model.compress_model("example/suzanne.obja", maxDecimateRatio=0.3, maxStep=10)
     #model.visualize_3d()
 if __name__ == '__main__':
     main()
