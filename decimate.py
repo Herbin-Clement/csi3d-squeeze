@@ -78,29 +78,51 @@ class Decimater(obja.Model):
     def get_graph(self):
         return self.graph
 
-    def compress_model(self, output_filename, maxDecimateRatio, max_step=10):
+    def stat(self, operations, printFaces=False):
+        addVertex = 0
+        addFace = 0
+        editFace = 0
+        removeFace = 0
+        for (ty, index, value) in operations:
+            if ty == "vertex":
+                addVertex += 1
+            elif ty == "face":
+                addFace += 1
+            elif ty == "edit_face":
+                editFace += 1
+            elif ty == "remove_face":
+                removeFace += 1
+        triangles = [clique for clique in nx.enumerate_all_cliques(self.graph) if len(clique) == 3]
+        print(f"graph: {len(triangles)}, our: {len(self.faces)}")
+        if printFaces:
+            print(sorted(triangles))
+            print(sorted([face for face in self.faces.values()]))
+        print(f"av {addVertex} af {addFace} ef {editFace} rf {removeFace}")
+
+    def compress_model(self, outputFilename, maxDecimateRatio, maxStep=10):
         compressed = False
         operations = []
         step = 0
         objToGraphe.draw_graph(self.graph)
         decimateRatio = 1
         initialNumberOfNodes = self.graph.number_of_nodes()
-        while (decimateRatio > maxDecimateRatio or step > max_step) and not compressed:
+
+        while decimateRatio > maxDecimateRatio and maxStep > step and not compressed:
             print(f"=========== Step {step + 1} ===========")
             step_operations = self.step_compression()
             operations = operations + step_operations
             step += 1
             decimateRatio = self.graph.number_of_nodes() / initialNumberOfNodes 
             print(f"Nb op: {len(step_operations)}")
+            self.stat(operations)
             print(f"Pourcentage de decimation actuel: {decimateRatio}")
-            if len(step_operations) == 0 or decimateRatio > maxDecimateRatio:
+            if len(step_operations) == 0 or decimateRatio < maxDecimateRatio:
                 compressed = True
 
-        objToGraphe.draw_graph(self.graph)
         operations.reverse()
 
         # Créer un objet Output pour écrire dans le fichier de sortie
-        with open(output_filename, 'w') as output_file:
+        with open(outputFilename, 'w') as output_file:
             output_model = obja.Output(output_file, random_color=True)
             
             for v in self.graph.nodes:
@@ -109,35 +131,31 @@ class Decimater(obja.Model):
                 output_model.add_face(face_index, Face(face[0], face[1], face[2]))
             
             # Appliquer les opérations de compression au modèle
-            # for (ty, index, value) in operations:
-            #     if ty == "vertex":
-            #         output_model.add_vertex(index, value)
-            #     elif ty == "face":
-            #         output_model.add_face(index, Face(value[0], value[1], value[2]))
-            #     elif ty == "edit_face":
-            #         output_model.edit_face(index, Face(value[0], value[1], value[2]))
-            #     elif ty == "remove_face":
-            #         output_model.remove_face(index)
-            #     else:
-            #         output_model.edit_vertex(index, value)
+            for (ty, index, value) in operations:
+                if ty == "vertex":
+                    output_model.add_vertex(index, value)
+                elif ty == "face":
+                    output_model.add_face(index, Face(value[0], value[1], value[2]))
+                elif ty == "edit_face":
+                    output_model.edit_face(index, Face(value[0], value[1], value[2]))
+                elif ty == "remove_face":
+                    output_model.remove_face(index)
+                else:
+                    output_model.edit_vertex(index, value)
         utils.pause()
         
 
     def step_compression(self):
-        mst = objToGraphe.minimum_spanning_tree(self.graph)
-        collapsed_vertices = set()
+        collapsed_vertices = []
         removed_vertices = []
         collapsed_edges = []
-        # mst_edges = list(mst.edges())
-        mst_edges = list(nx.dfs_edges(mst))
         new_edges = []
         operations = []
         ed = 0
+        mst = objToGraphe.minimum_spanning_tree(self.graph)
+        mst_edges = list(nx.dfs_edges(mst))
         for i, edge in enumerate(mst_edges):
             ed += 1
-            # print("--- Edge numero", ed, "/", len(mst_edges), edge)
-            # print("collapsed edges", collapsed_edges)
-            # print("collapsed vertices", collapsed_vertices)
             v1, v2 = edge
              # Vérifie si v1 ou v2 est déjà collapse
             if v1 in collapsed_vertices or v2 in collapsed_vertices:
@@ -146,20 +164,13 @@ class Decimater(obja.Model):
             # Récupère les voisins de v1 et v2
             neighbors_v1 = set(self.graph.neighbors(v1))
             neighbors_v2 = set(self.graph.neighbors(v2))
-            # neighbors = neighbors_v1.union(neighbors_v2)
-            neighbors = neighbors_v1.intersection(neighbors_v2)
-
-            # print(v1, neighbors_v1)
-            # print(v2, neighbors_v2)
+            neighbors = sorted(list(neighbors_v1.intersection(neighbors_v2)))
 
             valid = True
-            
-            # Pour chaque voisin w, vérifie si le couple (v1, v2, w) est un triangle valide
-            
+                        
             for w in neighbors:
                 if w != v1 and w != v2 and not utils.is_valid_triangle(v1, v2, w, self.faces):
                     valid = False
-                    # print("Première condition fausse")
                     break
 
             if not valid:
@@ -169,49 +180,63 @@ class Decimater(obja.Model):
                 if w1 != v2:
                     for w2 in neighbors_v2:
                         if w2 != v1:
-                            if set([w1,w2]) in collapsed_edges:
+                            if sorted([w1,w2]) in collapsed_edges:
                                 valid = False
-                                # print("Deuxième condition fausse")
                                 break
 
             if not valid:
                 continue
 
             # Si c'est bon, v2 va être collapse
-            collapsed_vertices.add(v1)
-            collapsed_vertices.add(v2)
-            collapsed_edges.append(set([v1,v2]))
+            collapsed_vertices.append(v1)
+            collapsed_vertices.append(v2)
+            collapsed_edges.append(sorted([v1,v2]))
             removed_vertices.append(v2)
+            print(f"remove {v2}")
             
+            for n2 in neighbors_v2:
+                if n2 != v1 and (n2 not in neighbors_v1) and n2 not in removed_vertices:
+                    print(f"add edge f{sorted([v1, n2])}")
+                    new_edges.append(sorted([v1, n2]))
+                    for n1 in neighbors_v1:
+                        if n1 not in removed_vertices and n1 != n2 and self.graph.has_edge(n1, n2):
+                            new_face = sorted([v1, n1, n2])
+                            found = False
+                            for face_index, face in self.faces.items():
+                                if sorted([v2, n1, n2]) == face:
+                                    operations.append(self.edit_face(face_index, sorted([v2, n1, n2]), new_face))
+                                    found = True
+                                    break
+                            if not found:
+                                operations.append(self.remove_face(new_face))
+                    for n2bis in neighbors_v2:
+                        if n2bis != v1 and (n2bis not in neighbors_v1) and n2bis not in removed_vertices:
+                            if self.graph.has_edge(n2, n2bis):
+                                new_face = sorted([v1, n2, n2bis])
+                                found = False
+                                for face_index, face in self.faces.items():
+                                    if sorted([v2, n2, n2bis]) == face:
+                                        operations.append(self.edit_face(face_index, sorted([v2, n2, n2bis]), new_face))
+                                        found = True
+                                        break
+                                if not found:
+                                    if new_face not in self.faces.values():
+                                        operations.append(self.remove_face(new_face))
+
             # Enlève les faces ayant v2
-            # print("collapse", v2)
             tmp_deleted_faces = dict()
             for face_index, face in self.faces.items():
                 if v2 in face:
                     tmp_deleted_faces[face_index] = face
-                    operations.append(('face', face_index, face))
             for face_index, face in tmp_deleted_faces.items():
-                # print("effacer", face_index, face)
+                operations.append(('face', face_index, face))
+                print(f"add {face}")
                 self.deleted_faces[face_index] = face
                 del self.faces[face_index]
             
-            # Reconnecter les voisins de v2 à v1
-            xx_hfsdhfcf=0
-            for n2 in neighbors_v2:
-                if n2 != v1 and (n2 not in neighbors_v1) and n2 not in removed_vertices:
-                    # print("ajout edge", (v1, n2))
-                    new_edges.append((v1, n2))
-                    
-                    for n1 in neighbors_v1:
-                        if n1 not in removed_vertices and n1 != n2 and self.graph.has_edge(n1, n2):
-                            new_face = [v1, n2, n1]
-                            # print("ajout face", self.faces_counter, new_face)
-                            self.faces[self.faces_counter] = (new_face)  
-                            operations.append(('remove_face', self.faces_counter, new_face))
-                            operations.append(('edit_vertex', n2, self.graph.nodes[n2]['pos']))
-                            self.faces_counter += 1
             vertex_v2 = self.graph.nodes[v2]['pos']
             operations.append(('vertex', v2, vertex_v2))
+        
         # Remove vertice
         b = len(self.graph.nodes)
         for node in removed_vertices:
@@ -222,6 +247,7 @@ class Decimater(obja.Model):
             if not (edgeaa[0] in removed_vertices or edgeaa[1] in removed_vertices):
                 self.graph.add_edge(edgeaa[0], edgeaa[1])
         # self.graph.add_edges_from(new_edges)
+        
         a = len(self.graph.nodes)
         print(f"{b} => {a}: -{b - a}")
         objToGraphe.draw_graph(self.graph)
@@ -230,20 +256,29 @@ class Decimater(obja.Model):
         
         return operations
 
+    def edit_face(self, face_index, current_face, new_face):
+        self.faces[face_index] = new_face
+        print(f"e1 {current_face} {new_face}")
+        return ('edit_face', face_index, new_face)
+    
+    def remove_face(self, new_face):
+        self.faces[self.faces_counter] = (new_face)  
+        print(f"rm1 {new_face}")
+        self.faces_counter += 1
+        return ('remove_face', self.faces_counter, new_face)
+
+
 def main():
     """
     Runs the program on the model given as parameter.
     """
     np.seterr(invalid = 'raise')
     model = Decimater()
-    filename='example/test.obj'
+    filename='example/suzanne.obj'
 
     model.load_graph(filename)
-
-    # graph = model.get_graph()
-    # objToGraphe.visualize_mst_simple(graph, objToGraphe.minimum_spanning_tree(graph))
     
-    model.compress_model("example/bunny.obja", maxDecimateRatio=0.3)
+    model.compress_model("example/bunny.obja", maxDecimateRatio=0.3, maxStep=2)
     #model.visualize_3d()
 if __name__ == '__main__':
     main()
