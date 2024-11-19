@@ -78,11 +78,12 @@ class Decimater(obja.Model):
     def get_graph(self):
         return self.graph
 
-    def stat(self, operations, printFaces=False):
+    def stat(self, operations, printFaces=True):
         addVertex = 0
         addFace = 0
         editFace = 0
         removeFace = 0
+        editFaceVertex = 0
         for (ty, index, value) in operations:
             if ty == "vertex":
                 addVertex += 1
@@ -92,12 +93,14 @@ class Decimater(obja.Model):
                 editFace += 1
             elif ty == "remove_face":
                 removeFace += 1
+            elif ty == "edit_face_vertex":
+                editFaceVertex += 1
         triangles = [clique for clique in nx.enumerate_all_cliques(self.graph) if len(clique) == 3]
         print(f"graph: {len(triangles)}, our: {len(self.faces)}")
         if printFaces:
             print(sorted(triangles))
             print(sorted([face for face in self.faces.values()]))
-        print(f"av {addVertex} af {addFace} ef {editFace} rf {removeFace}")
+        print(f"av {addVertex} af {addFace} ef {editFace} rf {removeFace} efv {editFaceVertex}")
 
     def compress_model(self, outputFilename, maxDecimateRatio, maxStep=10):
         compressed = False
@@ -140,6 +143,8 @@ class Decimater(obja.Model):
                     output_model.edit_face(index, Face(value[0], value[1], value[2]))
                 elif ty == "remove_face":
                     output_model.remove_face(index)
+                elif ty == "edit_face_vertex":
+                    output_model.edit_face_vertex(index, value[0], value[1])
                 else:
                     output_model.edit_vertex(index, value)
         utils.pause()
@@ -193,46 +198,38 @@ class Decimater(obja.Model):
             collapsed_edges.append(sorted([v1,v2]))
             removed_vertices.append(v2)
             print(f"remove {v2}")
-            
+
             for n2 in neighbors_v2:
                 if n2 != v1 and (n2 not in neighbors_v1) and n2 not in removed_vertices:
                     print(f"add edge f{sorted([v1, n2])}")
                     new_edges.append(sorted([v1, n2]))
-                    for n1 in neighbors_v1:
-                        if n1 not in removed_vertices and n1 != n2 and self.graph.has_edge(n1, n2):
-                            new_face = sorted([v1, n1, n2])
-                            found = False
-                            for face_index, face in self.faces.items():
-                                if sorted([v2, n1, n2]) == face:
-                                    operations.append(self.edit_face(face_index, sorted([v2, n1, n2]), new_face))
-                                    found = True
-                                    break
-                            if not found:
-                                operations.append(self.remove_face(new_face))
-                    for n2bis in neighbors_v2:
-                        if n2bis != v1 and (n2bis not in neighbors_v1) and n2bis not in removed_vertices:
-                            if self.graph.has_edge(n2, n2bis):
-                                new_face = sorted([v1, n2, n2bis])
-                                found = False
-                                for face_index, face in self.faces.items():
-                                    if sorted([v2, n2, n2bis]) == face:
-                                        operations.append(self.edit_face(face_index, sorted([v2, n2, n2bis]), new_face))
-                                        found = True
-                                        break
-                                if not found:
-                                    if new_face not in self.faces.values():
-                                        operations.append(self.remove_face(new_face))
 
             # Enlève les faces ayant v2
             tmp_deleted_faces = dict()
+            tmp_add_faces = dict()
             for face_index, face in self.faces.items():
                 if v2 in face:
-                    tmp_deleted_faces[face_index] = face
+                    other_face = face[:]
+                    other_face.remove(v2)
+                    other_face.append(v1)
+                    if sorted(other_face) not in self.faces.values() and v1 not in face:
+                        # print(f"edit face vertex {face} {other_face}")
+                        # self.faces[face_index] = sorted(other_face)
+                        # operations.append(('edit_face_vertex', face_index, (face.index(v2), v1)))
+                        tmp_deleted_faces[face_index] = face
+                        tmp_add_faces[self.faces_counter] = sorted(other_face)
+                        self.faces_counter += 1
+                    else:
+                        tmp_deleted_faces[face_index] = face
             for face_index, face in tmp_deleted_faces.items():
                 operations.append(('face', face_index, face))
                 print(f"add {face}")
                 self.deleted_faces[face_index] = face
                 del self.faces[face_index]
+            for face_index, face in tmp_add_faces.items():
+                operations.append(('remove_face', face_index, face))
+                print(f"add {face}")
+                self.faces[face_index] = face
             
             vertex_v2 = self.graph.nodes[v2]['pos']
             operations.append(('vertex', v2, vertex_v2))
@@ -278,7 +275,7 @@ def main():
 
     model.load_graph(filename)
     
-    model.compress_model("example/bunny.obja", maxDecimateRatio=0.3, maxStep=2)
+    model.compress_model("example/bunny.obja", maxDecimateRatio=0.3, maxStep=3)
     #model.visualize_3d()
 if __name__ == '__main__':
     main()
