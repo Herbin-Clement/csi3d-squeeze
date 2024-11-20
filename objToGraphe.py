@@ -36,7 +36,8 @@ def load_obj(filename):
             elif line.startswith('f '): 
                 parts = line.split()
                 face = [int(part.split('/')[0]) - 1 for part in parts[1:]]  # Indices des sommets
-                faces.append(list(set(face)))
+                face.sort()
+                faces.append(face)
     
     # Convertir vertices en un tableau numpy 2D
     vertices = np.array(vertices)
