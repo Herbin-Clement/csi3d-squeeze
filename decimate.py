@@ -154,8 +154,8 @@ class Decimater(obja.Model):
         diff_1_to_2 = [x for x in our if x not in nxgraph]
         diff_2_to_1 = [x for x in nxgraph if x not in our]
 
-        print("Présents dans nos faces mais pas dans nx graph:", diff_1_to_2)
-        print("Présents dans nx graph mais pas dans nos faces:", diff_2_to_1)
+        # print("Présents dans nos faces mais pas dans nx graph:", diff_1_to_2)
+        # print("Présents dans nx graph mais pas dans nos faces:", diff_2_to_1)
         utils.pause()
         
 
@@ -206,11 +206,9 @@ class Decimater(obja.Model):
             collapsed_vertices.append(v2)
             collapsed_edges.append(sorted([v1,v2]))
             removed_vertices.append(v2)
-            # print(f"remove {v2}")
 
             for n2 in neighbors_v2:
                 if n2 != v1 and (n2 not in neighbors_v1) and n2 not in removed_vertices:
-                    # print(f"add edge f{sorted([v1, n2])}")
                     new_edges.append(sorted([v1, n2]))
 
             # Enlève les faces ayant v2
@@ -257,21 +255,7 @@ class Decimater(obja.Model):
         a = len(self.graph.nodes)
         print(f"{b} => {a}: -{b - a}")
         objToGraphe.draw_graph(self.graph)
-        #self.visualize_3d()
-        # print("----------------------- FIN ITERATION -----------------------")
-        
         return operations
-
-    def edit_face(self, face_index, current_face, new_face):
-        self.faces[face_index] = new_face
-        print(f"e1 {current_face} {new_face}")
-        return ('edit_face', face_index, new_face)
-    
-    def remove_face(self, new_face):
-        self.faces[self.faces_counter] = (new_face)  
-        print(f"rm1 {new_face}")
-        self.faces_counter += 1
-        return ('remove_face', self.faces_counter, new_face)
 
 
 def main():
@@ -284,7 +268,7 @@ def main():
 
     model.load_graph(filename)
     
-    model.compress_model("example/bunny.obja", maxDecimateRatio=0.3, maxStep=10)
+    model.compress_model("example/bunny.obja", maxDecimateRatio=0.3, maxStep=0)
     #model.visualize_3d()
 if __name__ == '__main__':
     main()

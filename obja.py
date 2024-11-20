@@ -338,6 +338,14 @@ class Output:
             file=self.output
         )
 
+    def edit_face_vertex(self, face_index, vertex, new_vertex):
+        print('efv {} {} {}'.format(
+            self.face_mapping[face_index] + 1,
+            vertex,
+            self.vertex_mapping[new_vertex] + 1
+        ),
+            file=self.output
+        )
 
 def main():
     if len(sys.argv) == 1:
