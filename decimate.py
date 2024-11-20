@@ -126,7 +126,7 @@ class Decimater(obja.Model):
 
         # Créer un objet Output pour écrire dans le fichier de sortie
         with open(outputFilename, 'w') as output_file:
-            output_model = obja.Output(output_file, random_color=False)
+            output_model = obja.Output(output_file, random_color=True)
             
             for v in self.graph.nodes:
                 output_model.add_vertex(v, self.graph.nodes[v]["pos"])
@@ -148,14 +148,14 @@ class Decimater(obja.Model):
                 else:
                     output_model.edit_vertex(index, value)
 
-        # Trouver les différences entre tableau1 et tableau2
-        tableau1 = [sorted(x) for x in self.faces.values()]
-        tableau2 = [sorted(clique) for clique in nx.enumerate_all_cliques(self.graph) if len(clique) == 3]
-        diff_1_to_2 = [x for x in tableau1 if x not in tableau2]
-        diff_2_to_1 = [x for x in tableau2 if x not in tableau1]
+        # Trouver les différences entre nos faces et les faces de networkx
+        our = [sorted(x) for x in self.faces.values()]
+        nxgraph = [sorted(clique) for clique in nx.enumerate_all_cliques(self.graph) if len(clique) == 3]
+        diff_1_to_2 = [x for x in our if x not in nxgraph]
+        diff_2_to_1 = [x for x in nxgraph if x not in our]
 
-        print("Présents dans tableau1 mais pas dans tableau2:", diff_1_to_2)
-        print("Présents dans tableau2 mais pas dans tableau1:", diff_2_to_1)
+        print("Présents dans nos faces mais pas dans nx graph:", diff_1_to_2)
+        print("Présents dans nx graph mais pas dans nos faces:", diff_2_to_1)
         utils.pause()
         
 
@@ -280,11 +280,11 @@ def main():
     """
     np.seterr(invalid = 'raise')
     model = Decimater()
-    filename='example/suzanne.obj'
+    filename='example/bunny.obj'
 
     model.load_graph(filename)
     
-    model.compress_model("example/suzanne.obja", maxDecimateRatio=0.3, maxStep=10)
+    model.compress_model("example/bunny.obja", maxDecimateRatio=0.3, maxStep=10)
     #model.visualize_3d()
 if __name__ == '__main__':
     main()
