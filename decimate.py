@@ -14,61 +14,104 @@ class Decimater(obja.Model):
         self.deleted_faces = dict()
         self.graph = nx.empty_graph()
          
-    def visualize_3d(self):
-        vertices_coords = np.array([
-            [0, 0, 0],  # Vertex 1
-            [1, 0, 0],  # Vertex 2
-            [0, 1, 0],  # Vertex 3
-            [0, 0, 1],  # Vertex 4
-        ])
-
-        faces = [
-            [0, 1, 2],  # Face 1 (triangle)
-            [0, 1, 3],  # Face 2 (triangle)
-            [0, 2, 3],  # Face 3 (triangle)
-            [1, 2, 3],  # Face 4 (triangle)
-        ]
-        # Extraire les coordonnées des vertices
-        
-        vertices_coords = np.array([self.graph.nodes[v]['pos'] for v in self.graph.nodes])
-        
+    def visualize_3d(self): 
+        # 1. Extraire les coordonnées des sommets
+        vertices_coords = {v: np.array(self.graph.nodes[v]['pos']) for v in self.graph.nodes}
+        vertex_labels = list(vertices_coords.keys())
         # Vérifiez que les coordonnées des vertices sont bien extraites
-        if vertices_coords.shape[0] == 0:
-            
-            # print("Aucun vertex à afficher.")
+        if len(vertices_coords) == 0:
+            print("Aucun vertex à afficher.")
             return
 
-        # Préparer les faces pour Plotly (les faces sont des indices de vertices)
-        faces = []
-        for face in self.faces.values():
-            if len(face) == 3: 
-                faces.append(face)
-        
-        if len(faces) == 0:
+        # 2. Récupérer les faces du graphe
+        faces = self.get_triangles_from_graph()
+
+        # 3. Créer un mappage de "vertexToIndex" (associant chaque sommet à un index continu)
+        vertexToIndex = {v: i for i, v in enumerate(vertices_coords)}
+
+        # 4. Modifier les faces pour remplacer les indices des sommets par leurs indices continus
+        updated_faces = []
+        for face in faces:
+            updated_faces.append([vertexToIndex[v] for v in face])
+
+        # 5. Convertir les coordonnées en tableau NumPy pour les afficher avec Plotly
+        coords_array = np.array(list(vertices_coords.values()))  # Liste de toutes les coordonnées sous forme de tableau NumPy
+
+        # Vérifiez si des faces ont été trouvées
+        if len(updated_faces) == 0:
             print("Aucune face valide pour l'affichage.")
             return
+
+        # Créer les arêtes (edges) sous forme de lignes
+        edges_x, edges_y, edges_z = [], [], []
+        temp=[[6,7], [7,8]]
+        nb=0
+        for u, v in self.graph.edges():
+            nb+=1
+            """if (u,v)==(6,7):
+                 continue"""
+            
+            x_edge, y_edge, z_edge = [vertices_coords[u][0], vertices_coords[v][0]], [vertices_coords[u][1], vertices_coords[v][1]], [vertices_coords[u][2], vertices_coords[v][2]]
+            edges_x.extend(x_edge)
+            edges_y.extend(y_edge)
+            edges_z.extend(z_edge)
+        
+        # Créer les sommets sous forme de points
+        vertex_x = [coord[0] for coord in vertices_coords.values()]
+        vertex_y = [coord[1] for coord in vertices_coords.values()]
+        vertex_z = [coord[2] for coord in vertices_coords.values()]
+
         # Créer la visualisation 3D avec Plotly
-        fig = go.Figure(data=[go.Mesh3d(
-            x=vertices_coords[:, 0],  # Coordonnée x des vertices
-            y=vertices_coords[:, 1],  # Coordonnée y des vertices
-            z=vertices_coords[:, 2],  # Coordonnée z des vertices
-            i=[f[0] for f in faces],  # Indices de la première coordonnée des faces
-            j=[f[1] for f in faces],  # Indices de la deuxième coordonnée des faces
-            k=[f[2] for f in faces],  # Indices de la troisième coordonnée des faces
+        fig = go.Figure()
+
+        # Ajouter le maillage (faces)
+        """fig.add_trace(go.Mesh3d(
+            x=coords_array[:, 0],  # Coordonnée x des vertices
+            y=coords_array[:, 1],  # Coordonnée y des vertices
+            z=coords_array[:, 2],  # Coordonnée z des vertices
+            i=[f[0] for f in updated_faces],  # Indices de la première coordonnée des faces
+            j=[f[1] for f in updated_faces],  # Indices de la deuxième coordonnée des faces
+            k=[f[2] for f in updated_faces],  # Indices de la troisième coordonnée des faces
             opacity=0.5,
             color='blue',
             flatshading=True  # Pour un rendu sans arêtes visibles
-        )])
+        ))"""
 
+        # Ajouter les arêtes (edges)
+        fig.add_trace(go.Scatter3d(
+            x=edges_x,
+            y=edges_y,
+            z=edges_z,
+            mode='lines',
+            line=dict(color='black', width=2),
+            opacity=0.2,
+            name="Arêtes"
+        ))
+
+        # Ajouter les sommets (vertices)
+        fig.add_trace(go.Scatter3d(
+            x=vertex_x,
+            y=vertex_y,
+            z=vertex_z,
+            mode='markers+text',  # Afficher les marqueurs et le texte
+            marker=dict(size=5, color='red', symbol='circle'),
+            text=vertex_labels,  # Afficher les noms des sommets
+            textposition="top center",  # Position du texte
+            hoverinfo='text',  # Affiche seulement le texte au survol
+            name="Sommets",
+            opacity=0.2
+        ))
+
+        # Mettre à jour la disposition du graphique
         fig.update_layout(
             scene=dict(
                 xaxis=dict(showgrid=False),
                 yaxis=dict(showgrid=False),
                 zaxis=dict(showgrid=False)
             ),
-            title="3D Object Visualization"
+            title="3D Object Visualization with Edges and Vertices"
         )
-
+        
         fig.show()
 
     def load_graph(self, filename):
@@ -84,7 +127,7 @@ class Decimater(obja.Model):
         step = 0
         objToGraphe.draw_graph(self.graph)
         pourcentageDecimeActuel = self.graph.number_of_nodes() / totalVertex*100 
-        while (pourcentageDecimeActuel > pourcentageDecimate or step > max_step) and not compressed:
+        while (pourcentageDecimeActuel > pourcentageDecimate and step < max_step) and not compressed:
             pourcentageDecimeActuel = self.graph.number_of_nodes() / totalVertex*100 
             print(f"Pourcentage de decimation actuel: {pourcentageDecimeActuel}")
             print(f"=========== Step {step + 1} ===========")
@@ -122,111 +165,108 @@ class Decimater(obja.Model):
         
 
     def step_compression(self):
+        self.visualize_3d()
         mst = objToGraphe.minimum_spanning_tree(self.graph)
         collapsed_vertices = set()
         removed_vertices = []
         collapsed_edges = []
-        # mst_edges = list(mst.edges())
-        mst_edges = list(nx.dfs_edges(mst))
+        
+        mst_edges = list(nx.dfs_edges(mst))  # Utilisation de DFS pour explorer les arêtes
         new_edges = []
         operations = []
         ed = 0
+        
+        # Compression des vertices en suivant l'arbre couvrant minimal
         for i, edge in enumerate(mst_edges):
             ed += 1
-            # print("--- Edge numero", ed, "/", len(mst_edges), edge)
-            # print("collapsed edges", collapsed_edges)
-            # print("collapsed vertices", collapsed_vertices)
             v1, v2 = edge
-             # Vérifie si v1 ou v2 est déjà collapse
             if v1 in collapsed_vertices or v2 in collapsed_vertices:
                 continue
-
-            # Récupère les voisins de v1 et v2
+            
             neighbors_v1 = set(self.graph.neighbors(v1))
             neighbors_v2 = set(self.graph.neighbors(v2))
-            # neighbors = neighbors_v1.union(neighbors_v2)
             neighbors = neighbors_v1.intersection(neighbors_v2)
-
-            # print(v1, neighbors_v1)
-            # print(v2, neighbors_v2)
-
+            
             valid = True
-            
-            # Pour chaque voisin w, vérifie si le couple (v1, v2, w) est un triangle valide
-            
             for w in neighbors:
                 if w != v1 and w != v2 and not utils.is_valid_triangle(v1, v2, w, self.faces):
                     valid = False
-                    # print("Première condition fausse")
                     break
-
+            
             if not valid:
                 continue
-
+            
             for w1 in neighbors_v1:
                 if w1 != v2:
                     for w2 in neighbors_v2:
                         if w2 != v1:
-                            if set([w1,w2]) in collapsed_edges:
+                            if set([w1, w2]) in collapsed_edges:
                                 valid = False
-                                # print("Deuxième condition fausse")
                                 break
 
             if not valid:
                 continue
-
-            # Si c'est bon, v2 va être collapse
+            
             collapsed_vertices.add(v1)
             collapsed_vertices.add(v2)
-            collapsed_edges.append(set([v1,v2]))
+            collapsed_edges.append(set([v1, v2]))
             removed_vertices.append(v2)
             
-            # Enlève les faces ayant v2
-            # print("collapse", v2)
             tmp_deleted_faces = dict()
             for face_index, face in self.faces.items():
                 if v2 in face:
                     tmp_deleted_faces[face_index] = face
                     operations.append(('face', face_index, face))
+            
             for face_index, face in tmp_deleted_faces.items():
-                # print("effacer", face_index, face)
                 self.deleted_faces[face_index] = face
                 del self.faces[face_index]
             
-            # Reconnecter les voisins de v2 à v1
-            xx_hfsdhfcf=0
             for n2 in neighbors_v2:
                 if n2 != v1 and (n2 not in neighbors_v1) and n2 not in removed_vertices:
-                    # print("ajout edge", (v1, n2))
                     new_edges.append((v1, n2))
-                    
                     for n1 in neighbors_v1:
                         if n1 not in removed_vertices and n1 != n2 and self.graph.has_edge(n1, n2):
                             new_face = [v1, n2, n1]
-                            # print("ajout face", self.faces_counter, new_face)
-                            self.faces[self.faces_counter] = (new_face)  
+                            self.faces[self.faces_counter] = (new_face)
                             operations.append(('remove_face', self.faces_counter, new_face))
                             operations.append(('edit_vertex', n2, self.graph.nodes[n2]['pos']))
                             self.faces_counter += 1
+            
             vertex_v2 = self.graph.nodes[v2]['pos']
             operations.append(('vertex', v2, vertex_v2))
-        # Remove vertice
+
+        # Suppression des vertices
         b = len(self.graph.nodes)
         for node in removed_vertices:
             self.graph.remove_node(node)
 
-        # Add edges
+        # Ajout des nouvelles arêtes
         for edgeaa in new_edges:
             if not (edgeaa[0] in removed_vertices or edgeaa[1] in removed_vertices):
                 self.graph.add_edge(edgeaa[0], edgeaa[1])
-        # self.graph.add_edges_from(new_edges)
+
+        # Mise à jour des faces pour qu'elles soient égales aux cliques de taille 3
+        triangles = self.get_triangles_from_graph()  # Trouver toutes les cliques de taille 3
+        self.faces = {}  # Réinitialiser les faces avant d'ajouter les nouvelles
+        for i, triangle in enumerate(triangles):
+            self.faces[i] = triangle  # Ajouter la face (triangle)
+        
         a = len(self.graph.nodes)
         print(f"{b} => {a}: -{b - a}")
         objToGraphe.draw_graph(self.graph)
-        #self.visualize_3d()
-        # print("----------------------- FIN ITERATION -----------------------")
-        
         return operations
+
+    def get_triangles_from_graph(self):
+        """
+        Trouve toutes les cliques de taille 3 dans le graphe et les retourne comme faces.
+        """
+        triangles = []
+        for clique in nx.enumerate_all_cliques(self.graph):
+            if len(clique) == 3:
+                triangles.append(list(clique))
+        return triangles
+
 
 def main():
     """
@@ -241,7 +281,7 @@ def main():
     # graph = model.get_graph()
     # objToGraphe.visualize_mst_simple(graph, objToGraphe.minimum_spanning_tree(graph))
     
-    model.compress_model("example/bunny.obja", len(model.graph.nodes),pourcentageDecimate=0.3)
+    model.compress_model("example/bunny.obja", len(model.graph.nodes),pourcentageDecimate=0.3,max_step=1)
     #model.visualize_3d()
 if __name__ == '__main__':
     main()
