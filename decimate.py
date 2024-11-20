@@ -116,10 +116,12 @@ class Decimater(obja.Model):
         """
         return self.graph
 
-    def stat_step(self, operations, printFaces=False):
+    def stat_step(self, operations, decimateRatio, printFaces=False):
         """
         Display some stat about a compression step
         """
+        print(f"Nb op: {len(operations)}")
+        print(f"Pourcentage de decimation actuel: {decimateRatio}")
         addVertex = 0
         addFace = 0
         editFace = 0
@@ -143,7 +145,7 @@ class Decimater(obja.Model):
             print(sorted([face for face in self.faces.values()]))
         print(f"av {addVertex} af {addFace} ef {editFace} rf {removeFace} efv {editFaceVertex}")
 
-    def compress_model(self, outputFilename, maxDecimateRatio, maxStep=10, printDiff=False):
+    def compress_model(self, outputFilename, maxDecimateRatio, maxStep=10, printDiff=True):
         """
         Compress the model
         """
@@ -155,51 +157,21 @@ class Decimater(obja.Model):
         initialNumberOfNodes = self.graph.number_of_nodes()
 
         while decimateRatio > maxDecimateRatio and maxStep > step and not compressed:
-            print(f"=========== Step {step + 1} ===========")
+            step += 1
+            print(f"=========== Step {step} ===========")
             step_operations = self.step_compression()
             operations = operations + step_operations
-            step += 1
             decimateRatio = self.graph.number_of_nodes() / initialNumberOfNodes 
-            print(f"Nb op: {len(step_operations)}")
-            self.stat_step(operations)
-            print(f"Pourcentage de decimation actuel: {decimateRatio}")
+            self.stat_step(step_operations, decimateRatio)
             if len(step_operations) == 0 or decimateRatio < maxDecimateRatio:
                 compressed = True
 
         operations.reverse()
 
-        # Créer un objet Output pour écrire dans le fichier de sortie
-        with open(outputFilename, 'w') as output_file:
-            output_model = obja.Output(output_file, random_color=True)
-            
-            for v in self.graph.nodes:
-                output_model.add_vertex(v, self.graph.nodes[v]["pos"])
-            for face_index, face in self.faces.items():
-                output_model.add_face(face_index, Face(face[0], face[1], face[2]))
-            
-            # Appliquer les opérations de compression au modèle
-            for (ty, index, value) in operations:
-                if ty == "vertex":
-                    output_model.add_vertex(index, value)
-                elif ty == "face":
-                    output_model.add_face(index, Face(value[0], value[1], value[2]))
-                elif ty == "edit_face":
-                    output_model.edit_face(index, Face(value[0], value[1], value[2]))
-                elif ty == "remove_face":
-                    output_model.remove_face(index)
-                elif ty == "edit_face_vertex":
-                    output_model.edit_face_vertex(index, value[0], value[1])
-                else:
-                    output_model.edit_vertex(index, value)
+        self.write_model(outputFilename, operations)
 
         if printDiff:
-            # Trouver les différences entre nos faces et les faces de networkx
-            our_faces = [sorted(x) for x in self.faces.values()]
-            nxgraph_faces = [sorted(clique) for clique in nx.enumerate_all_cliques(self.graph) if len(clique) == 3]
-            our_to_nxgraph = [x for x in our_faces if x not in nxgraph_faces]
-            nxgraph_to_our = [x for x in nxgraph_faces if x not in our_faces]
-            # print("Présents dans nos faces mais pas dans nx graph:", our_to_nxgraph)
-            # print("Présents dans nx graph mais pas dans nos faces:", nxgraph_to_our)
+            self.print_diff()
 
         utils.pause()
         
@@ -220,34 +192,19 @@ class Decimater(obja.Model):
             ed += 1
             v1, v2 = edge
             # Première condition
-            if v1 in collapsed_vertices or v2 in collapsed_vertices:
+            if not self.check_first_cond(v1, v2, collapsed_edges):
                 continue
             
             neighbors_v1 = set(self.graph.neighbors(v1))
             neighbors_v2 = set(self.graph.neighbors(v2))
             neighbors = sorted(list(neighbors_v1.intersection(neighbors_v2)))
-
-            valid = True
             
-            # Deuxième condition
-            for w in neighbors:
-                if w != v1 and w != v2 and not utils.is_valid_triangle(v1, v2, w, self.faces):
-                    valid = False
-                    break
-            
-            if not valid:
+            # Seconde condition
+            if not self.check_second_cond(v1, v2, neighbors):
                 continue
             
             # Troisième condition
-            for w1 in neighbors_v1:
-                if w1 != v2:
-                    for w2 in neighbors_v2:
-                        if w2 != v1:
-                            if sorted([w1,w2]) in collapsed_edges:
-                                valid = False
-                                break
-
-            if not valid:
+            if not self.check_third_cond(v1, v2, neighbors_v1, neighbors_v2, collapsed_edges):
                 continue
 
             # Si c'est bon, v2 va être collapse
@@ -257,36 +214,12 @@ class Decimater(obja.Model):
             removed_vertices.append(v2)
 
             # Relie les voisins de v2 à v1
-            for n2 in neighbors_v2:
-                if n2 != v1 and (n2 not in neighbors_v1) and n2 not in removed_vertices:
-                    new_edges.append(sorted([v1, n2]))
-
-            # Parcours les faces
-            tmp_deleted_faces = dict()
-            tmp_add_faces = dict()
-            for face_index, face in self.faces.items():
-                if v2 in face and v1 not in face: # Si v2 est dans la face mais pas v1, change v2 par v1
-                    new_face = face[:]
-                    new_face.remove(v2)
-                    new_face.append(v1)
-                    if sorted(new_face) not in self.faces.values(): # Si la nouvelle face n'existe pas encore, créer la nouvelle face
-                        tmp_deleted_faces[face_index] = face        # et efface la face contenant v2
-                        tmp_add_faces[self.faces_counter] = sorted(new_face)
-                        self.faces_counter += 1
-                    else: # Sinon, efface juste la face contenant v2
-                        tmp_deleted_faces[face_index] = face
-
-            # Supprime les faces    
-            for face_index, face in tmp_deleted_faces.items():
-                operations.append(('face', face_index, face))
-                self.deleted_faces[face_index] = face
-                del self.faces[face_index]
+            self.update_edges(v1, neighbors_v1, neighbors_v2, removed_vertices, new_edges)
             
-            # Ajoute les nouvelles faces
-            for face_index, face in tmp_add_faces.items():
-                operations.append(('remove_face', face_index, face))
-                self.faces[face_index] = face
-            
+            # Met à jour les faces
+            self.update_faces(v1, v2, operations)
+
+            # Supprime v2
             vertex_v2 = self.graph.nodes[v2]['pos']
             operations.append(('vertex', v2, vertex_v2))
         
@@ -301,6 +234,118 @@ class Decimater(obja.Model):
 
         return operations
 
+    def check_first_cond(self, v1, v2, collapsed_vertices):
+        """
+        Check the first condition
+        """
+        return not (v1 in collapsed_vertices or v2 in collapsed_vertices)
+
+    def check_second_cond(self, v1, v2, neighbors):
+        """
+        Check the second condition
+        """
+        valid = True
+        # Deuxième condition
+        for w in neighbors:
+            if w != v1 and w != v2 and not utils.is_valid_triangle(v1, v2, w, self.faces):
+                valid = False
+                break
+        return valid
+
+    def check_third_cond(self, v1, v2, neighbors_v1, neighbors_v2, collapsed_edges):
+        """
+        Check the third condition
+        """
+        valid = True
+        # Troisième condition
+        for w1 in neighbors_v1:
+            if w1 != v2:
+                for w2 in neighbors_v2:
+                    if w2 != v1:
+                        if sorted([w1,w2]) in collapsed_edges:
+                            valid = False
+                            break
+        return valid
+
+    def update_edges(self, v1, neighbors_v1, neighbors_v2, removed_vertices, new_edges):
+        """
+        Link neighbors of v2 to v1
+        """
+        for n2 in neighbors_v2:
+            if n2 != v1 and (n2 not in neighbors_v1) and n2 not in removed_vertices:
+                new_edges.append(sorted([v1, n2]))
+
+    def update_faces(self, v1, v2, operations):
+        """
+        Remove faces containing v2 and add the new faces containing v1
+        """
+        # Parcours les faces
+        tmp_deleted_faces = dict()
+        tmp_add_faces = dict()
+        for face_index, face in self.faces.items():
+            if v2 in face: # Si v2 est dans la face mais pas v1, change v2 par v1
+                new_face = face[:]
+                new_face.remove(v2)
+                new_face.append(v1)
+                if sorted(new_face) not in self.faces.values() and v1 not in face: # Si la nouvelle face n'existe pas encore, créer la nouvelle face
+                    tmp_deleted_faces[face_index] = face        # et efface la face contenant v2
+                    tmp_add_faces[self.faces_counter] = sorted(new_face)
+                    self.faces_counter += 1
+                else: # Sinon, efface juste la face contenant v2
+                    tmp_deleted_faces[face_index] = face
+
+        # Supprime les faces    
+        for face_index, face in tmp_deleted_faces.items():
+            operations.append(('face', face_index, face))
+            self.deleted_faces[face_index] = face
+            del self.faces[face_index]
+        
+        # Ajoute les nouvelles faces
+        for face_index, face in tmp_add_faces.items():
+            operations.append(('remove_face', face_index, face))
+            self.faces[face_index] = face
+            
+
+    def write_model(self, outputFilename, operations):
+        """
+        Write model in obja file
+        """
+        # Créer un objet Output pour écrire dans le fichier de sortie
+        with open(outputFilename, 'w') as output_file:
+            outputModel = obja.Output(output_file, random_color=True)
+            
+            for v in self.graph.nodes:
+                outputModel.add_vertex(v, self.graph.nodes[v]["pos"])
+            for face_index, face in self.faces.items():
+                outputModel.add_face(face_index, Face(face[0], face[1], face[2]))
+            
+            # Appliquer les opérations de compression au modèle
+            for (ty, index, value) in operations:
+                if ty == "vertex":
+                    outputModel.add_vertex(index, value)
+                elif ty == "face":
+                    outputModel.add_face(index, Face(value[0], value[1], value[2]))
+                elif ty == "edit_face":
+                    outputModel.edit_face(index, Face(value[0], value[1], value[2]))
+                elif ty == "remove_face":
+                    outputModel.remove_face(index)
+                elif ty == "edit_face_vertex":
+                    outputModel.edit_face_vertex(index, value[0], value[1])
+                else:
+                    outputModel.edit_vertex(index, value)
+
+    def print_diff(self):
+        """
+        Print faces differences between networkx graph and our faces
+        """
+        # Trouver les différences entre nos faces et les faces de networkx
+        our_faces = [sorted(x) for x in self.faces.values()]
+        nxgraph_faces = [sorted(clique) for clique in nx.enumerate_all_cliques(self.graph) if len(clique) == 3]
+        our_to_nxgraph = [x for x in our_faces if x not in nxgraph_faces]
+        nxgraph_to_our = [x for x in nxgraph_faces if x not in our_faces]
+        print("Présents dans nos faces mais pas dans nx graph:", our_to_nxgraph)
+        print("Présents dans nx graph mais pas dans nos faces:", nxgraph_to_our)
+
 def main():
     """
     Runs the program on the model given as parameter.
@@ -311,7 +356,7 @@ def main():
 
     model.load_graph(filename)
     
-    model.compress_model("example/suzanne.obja", maxDecimateRatio=0.3, maxStep=0)
+    model.compress_model("example/suzanne.obja", maxDecimateRatio=0.3, maxStep=3)
 
 if __name__ == '__main__':
     main()
