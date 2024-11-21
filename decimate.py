@@ -192,7 +192,7 @@ class Decimater(obja.Model):
             ed += 1
             v1, v2 = edge
             # Première condition
-            if not self.check_first_cond(v1, v2, collapsed_edges):
+            if not self.check_first_cond(v1, v2, collapsed_vertices):
                 continue
             
             neighbors_v1 = set(self.graph.neighbors(v1))
@@ -356,7 +356,7 @@ def main():
 
     model.load_graph(filename)
     
-    model.compress_model("example/suzanne.obja", maxDecimateRatio=0.3, maxStep=3)
+    model.compress_model("example/suzanne.obja", maxDecimateRatio=0.05, maxStep=10)
 
 if __name__ == '__main__':
     main()
