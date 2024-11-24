@@ -1,9 +1,10 @@
 #!/usr/bin/env python
-import time
 import obja
 import numpy as np
+from scipy.spatial.distance import directed_hausdorff
 import objToGraphe
 import utils
+import trimesh
 import networkx as nx
 from obja import Face 
 import plotly.graph_objects as go
@@ -168,7 +169,8 @@ class Decimater(obja.Model):
 
         operations.reverse()
 
-        self.write_model(outputFilename, operations)
+        self.write_obja(outputFilename, operations)
+        self.write_obj(outputFilename)
 
         if printDiff:
             self.print_diff()
@@ -306,12 +308,12 @@ class Decimater(obja.Model):
             self.faces[face_index] = face
             
 
-    def write_model(self, outputFilename, operations):
+    def write_obja(self, outputFilename, operations):
         """
         Write model in obja file
         """
         # Créer un objet Output pour écrire dans le fichier de sortie
-        with open(outputFilename, 'w') as output_file:
+        with open(f"{outputFilename}.obja", 'w') as output_file:
             outputModel = obja.Output(output_file, random_color=True)
             
             for v in self.graph.nodes:
@@ -334,6 +336,19 @@ class Decimater(obja.Model):
                 else:
                     outputModel.edit_vertex(index, value)
 
+    def write_obj(self, outputFilename):
+        """
+        Write model in obj file
+        """
+        # Créer un objet Output pour écrire dans le fichier de sortie
+        with open(f"{outputFilename}_m0.obj", 'w') as output_file:
+            outputModel = obja.Output(output_file, random_color=True)
+            
+            for v in self.graph.nodes:
+                outputModel.add_vertex(v, self.graph.nodes[v]["pos"])
+            for face_index, face in self.faces.items():
+                outputModel.add_face(face_index, Face(face[0], face[1], face[2]))
+
     def print_diff(self):
         """
         Print faces differences between networkx graph and our faces
@@ -346,6 +361,20 @@ class Decimater(obja.Model):
         print("Présents dans nos faces mais pas dans nx graph:", our_to_nxgraph)
         print("Présents dans nx graph mais pas dans nos faces:", nxgraph_to_our)
 
+    def print_metric(self, obj1, obj2):
+        # Charger deux maillages depuis des fichiers
+        mesh1 = trimesh.load(obj1)
+        mesh2 = trimesh.load(obj2)
+
+        # Extraire les sommets
+        vertices_mesh1 = mesh1.vertices
+        vertices_mesh2 = mesh2.vertices
+
+        # Calculer la distance de Hausdorff
+        distance1 = directed_hausdorff(vertices_mesh1, vertices_mesh2)
+        distance2 = directed_hausdorff(vertices_mesh2, vertices_mesh1)
+        print(f"Distance de Hausdorff avec Trimesh: {max(distance1, distance2)}")
+
 def main():
     """
     Runs the program on the model given as parameter.
@@ -356,7 +385,9 @@ def main():
 
     model.load_graph(filename)
     
-    model.compress_model("example/suzanne.obja", maxDecimateRatio=0.05, maxStep=10)
+    model.compress_model("example/suzanne", maxDecimateRatio=0.05, maxStep=10)
+
+    # model.print_metric("example/suzanne.obj", "example/suzanne_m0.obj") # Faut transformer notre obja en obj :)
 
 if __name__ == '__main__':
     main()
